@@ -514,6 +514,11 @@ impl WindowBuilder {
         self.0.set_window_state(state);
     }
 
+    #[cfg(target_family = "wasm")]
+    pub fn set_canvas_element(&mut self, canvas_element: web_sys::HtmlCanvasElement) {
+        self.0.set_canvas_element(canvas_element);
+    }
+
     /// Attempt to construct the platform window.
     ///
     /// If this fails, your application should exit.

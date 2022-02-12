@@ -157,9 +157,64 @@ impl AppDelegate<State> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(sys_cmds::NEW_FILE) {
-            let new_win = WindowDesc::new(ui_builder())
+            #[allow(unused)]
+            let mut new_win = WindowDesc::new(ui_builder())
                 .menu(make_menu)
                 .window_size((data.selected as f64 * 100.0 + 300.0, 500.0));
+            #[cfg(target_family = "wasm")]
+            {
+                // this is a web application, so use window.open() to open a new window and create
+                // a new canvas there for the new druid window
+                use wasm_bindgen::JsCast;
+                let this_window = web_sys::window().expect("Window variable unset");
+                let new_window = this_window
+                    .open_with_url_and_target_and_features("", "", "popup")
+                    .expect("window.open() threw error");
+                let new_window = match new_window {
+                    Some(new_window) => new_window,
+                    None => {
+                        info!("Couldn't open new window -- popup blocker?");
+                        return Handled::Yes;
+                    }
+                };
+
+                let new_document = new_window.document().expect("new_window has no document");
+                let canvas_element = new_document
+                    .create_element("canvas")
+                    .expect("Couldn't create canvas")
+                    .dyn_into::<web_sys::HtmlCanvasElement>()
+                    .expect("Couldn't cast canvas HtmlElement to HtmlCanvasElement");
+                let body_element = new_document.body().expect("new_document has no body");
+                body_element
+                    .append_with_node_1(&canvas_element)
+                    .expect("Couldn't append canvas");
+
+                // set CSS so that the canvas always fills the entire window
+                fn make_element_fullscreen(element: &web_sys::HtmlElement) {
+                    for (property, value) in [
+                        ("margin", "0px"),
+                        ("padding", "0px"),
+                        ("width", "100%"),
+                        ("height", "100%"),
+                        ("overflow", "hidden"),
+                    ] {
+                        element
+                            .style()
+                            .set_property(property, value)
+                            .expect(&format!("Setting property {} failed", property))
+                    }
+                }
+                let document_element = new_document
+                    .document_element()
+                    .expect("new_document has no documentElement")
+                    .dyn_into::<web_sys::HtmlElement>()
+                    .expect("Couldn't cast document.documentElement to HtmlElement");
+                make_element_fullscreen(&document_element);
+                make_element_fullscreen(&body_element);
+                make_element_fullscreen(&canvas_element);
+
+                new_win = new_win.canvas_element(canvas_element);
+            }
             ctx.new_window(new_win);
             Handled::Yes
         } else {

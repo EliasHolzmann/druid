@@ -75,6 +75,7 @@ pub(crate) struct WindowBuilder {
     title: String,
     cursor: Cursor,
     menu: Option<Menu>,
+    canvas_element: Option<web_sys::HtmlCanvasElement>,
 }
 
 #[derive(Clone, Default)]
@@ -357,6 +358,7 @@ impl WindowBuilder {
             title: String::new(),
             cursor: Cursor::Arrow,
             menu: None,
+            canvas_element: None,
         }
     }
 
@@ -405,15 +407,22 @@ impl WindowBuilder {
         self.menu = Some(menu);
     }
 
+    pub fn set_canvas_element(&mut self, canvas_element: web_sys::HtmlCanvasElement) {
+        self.canvas_element = Some(canvas_element);
+    }
+
     pub fn build(self) -> Result<WindowHandle, Error> {
         let window = web_sys::window().ok_or(Error::NoWindow)?;
-        let canvas = window
-            .document()
-            .ok_or(Error::NoDocument)?
-            .get_element_by_id("canvas")
-            .ok_or_else(|| Error::NoElementById("canvas".to_string()))?
-            .dyn_into::<web_sys::HtmlCanvasElement>()
-            .map_err(|_| Error::JsCast)?;
+        let canvas = match self.canvas_element {
+            Some(canvas_element) => canvas_element,
+            None => window
+                .document()
+                .ok_or(Error::NoDocument)?
+                .get_element_by_id("canvas")
+                .ok_or_else(|| Error::NoElementById("canvas".to_string()))?
+                .dyn_into::<web_sys::HtmlCanvasElement>()
+                .map_err(|_| Error::JsCast)?,
+        };
         let context = canvas
             .get_context("2d")?
             .ok_or(Error::NoContext)?

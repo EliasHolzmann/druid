@@ -64,6 +64,8 @@ pub struct WindowConfig {
     pub(crate) show_titlebar: Option<bool>,
     pub(crate) level: Option<WindowLevel>,
     pub(crate) state: Option<WindowState>,
+    #[cfg(target_family = "wasm")]
+    pub(crate) canvas_element: Option<web_sys::HtmlCanvasElement>,
 }
 
 /// A description of a window to be instantiated.
@@ -272,7 +274,8 @@ impl<T: Data> AppLauncher<T> {
 
 impl Default for WindowConfig {
     fn default() -> Self {
-        WindowConfig {
+        #[cfg(target_family = "wasm")]
+        return WindowConfig {
             size_policy: WindowSizePolicy::User,
             size: None,
             min_size: None,
@@ -282,7 +285,21 @@ impl Default for WindowConfig {
             transparent: None,
             level: None,
             state: None,
-        }
+            canvas_element: None,
+        };
+
+        #[cfg(not(target_family = "wasm"))]
+        return WindowConfig {
+            size_policy: WindowSizePolicy::User,
+            size: None,
+            min_size: None,
+            position: None,
+            resizable: None,
+            show_titlebar: None,
+            transparent: None,
+            level: None,
+            state: None,
+        };
     }
 }
 
@@ -382,6 +399,12 @@ impl WindowConfig {
         self
     }
 
+    #[cfg(target_family = "wasm")]
+    pub fn canvas_element(mut self, canvas_element: web_sys::HtmlCanvasElement) -> Self {
+        self.canvas_element = Some(canvas_element);
+        self
+    }
+
     /// Apply this window configuration to the passed in WindowBuilder
     pub fn apply_to_builder(&self, builder: &mut WindowBuilder) {
         if let Some(resizable) = self.resizable {
@@ -417,6 +440,11 @@ impl WindowConfig {
         if let Some(min_size) = self.min_size {
             builder.set_min_size(min_size);
         }
+
+        #[cfg(target_family = "wasm")]
+        if let Some(canvas_element) = self.canvas_element.clone() {
+            builder.set_canvas_element(canvas_element);
+        }
     }
 
     /// Apply this window configuration to the passed in WindowHandle
@@ -447,6 +475,11 @@ impl WindowConfig {
         if let Some(state) = self.state {
             win_handle.set_window_state(state);
         }
+
+        #[cfg(target_family = "wasm")]
+        if let Some(_) = self.canvas_element {
+            warn!("Applying a canvas element can only be done on window builders");
+        }
     }
 }
 
@@ -458,11 +491,11 @@ impl<T: Data> WindowDesc<T> {
     where
         W: Widget<T> + 'static,
     {
-        WindowDesc {
+        return WindowDesc {
             pending: PendingWindow::new(root),
             config: WindowConfig::default(),
             id: WindowId::next(),
-        }
+        };
     }
 
     /// Set the title for this window. This is a [`LabelText`]; it can be either
@@ -582,6 +615,12 @@ impl<T: Data> WindowDesc<T> {
     /// Set initial state for the window.
     pub fn set_window_state(mut self, state: WindowState) -> Self {
         self.config = self.config.set_window_state(state);
+        self
+    }
+
+    #[cfg(target_family = "wasm")]
+    pub fn canvas_element(mut self, canvas_element: web_sys::HtmlCanvasElement) -> Self {
+        self.config = self.config.canvas_element(canvas_element);
         self
     }
 
