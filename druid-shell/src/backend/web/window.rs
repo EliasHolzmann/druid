@@ -412,10 +412,10 @@ impl WindowBuilder {
     }
 
     pub fn build(self) -> Result<WindowHandle, Error> {
-        let window = web_sys::window().ok_or(Error::NoWindow)?;
         let canvas = match self.canvas_element {
             Some(canvas_element) => canvas_element,
-            None => window
+            None => web_sys::window()
+                .ok_or(Error::NoWindow)?
                 .document()
                 .ok_or(Error::NoDocument)?
                 .get_element_by_id("canvas")
@@ -423,6 +423,14 @@ impl WindowBuilder {
                 .dyn_into::<web_sys::HtmlCanvasElement>()
                 .map_err(|_| Error::JsCast)?,
         };
+        // window must be the window that contains the canvas => web_sys::window() might be wrong
+        let window = canvas
+            .get_root_node()
+            .dyn_into::<web_sys::Document>()
+            .expect("getRootNode() didn't return Document")
+            .default_view()
+            .expect("defaultView() returned null");
+
         let context = canvas
             .get_context("2d")?
             .ok_or(Error::NoContext)?
